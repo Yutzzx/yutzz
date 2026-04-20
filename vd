@@ -1,19 +1,12 @@
--- Rayfield UI + VD SCRIPT ESP + Speed Hack
-
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
--- =============================================
--- CONFIG
--- =============================================
 local Config = {
     Players = {
-        Killer = {Color = Color3.fromRGB(255, 93, 108)},
+        Killer = {Color = Color3.fromRGB(255, 93, 108)}, 
         Survivor = {Color = Color3.fromRGB(64, 224, 255)}
     },
     Objects = {
-        Generator = {Color = Color3.fromRGB(150, 0, 200)},
+        Generator = {Color = Color3.fromRGB(150, 0, 200)}, 
         Gate = {Color = Color3.fromRGB(255, 255, 255)},
-        Pallet = {Color = Color3.fromRGB(74, 255, 181)},
+        Pallet = {Color = Color3.fromRGB(74, 255, 181)}, 
         Window = {Color = Color3.fromRGB(74, 255, 181)},
         Hook = {Color = Color3.fromRGB(132, 255, 169)}
     }
@@ -39,17 +32,14 @@ local MaskColors = {
     ["Alex"] = Color3.fromRGB(255, 255, 255)
 }
 
--- =============================================
--- SERVICES
--- =============================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
-local player = LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local ActiveGenerators = {}
 local LastUpdateTick = 0
@@ -61,55 +51,467 @@ local HeartbeatConnection = nil
 local VisibilityConnection = nil
 local IndicatorGui = nil
 
--- =============================================
--- SPEED HACK VARIABLES
--- =============================================
 local speedHackEnabled = false
 local desiredSpeed = 16
-local connections = {}
+local speedConnections = {}
+local autoSkillcheckEnabled = true
+local fullbrightEnabled = true
+local isMinimized = false
 
 -- =============================================
--- FEATURE TOGGLES
+-- MOBILE UI SETUP
 -- =============================================
-local Features = {
-    ESPEnabled = true,
-    PlayerESP = true,
-    GeneratorESP = true,
-    HookESP = true,
-    PalletESP = true,
-    WindowESP = true,
-    GateESP = true,
-    KillerWarning = true,
-    FullBright = true,
-    AutoSkillCheck = true,
-    NextKillerDisplay = true,
-    ChasedIndicator = true,
-    KillerOffscreenArrow = true,
-}
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "VDMobileUI"
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.DisplayOrder = 9999
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Enabled = true
+ScreenGui.Parent = PlayerGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 280, 0, 400)
+MainFrame.Position = UDim2.new(0, 10, 0.5, -200)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local originalSize = MainFrame.Size
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(100, 100, 255)
+MainStroke.Thickness = 1.5
+MainStroke.Parent = MainFrame
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = TitleBar
+
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0.5, 0)
+TitleFix.Position = UDim2.new(0, 0, 0.5, 0)
+TitleFix.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Size = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "Violence District"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 15
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+local SubLabel = Instance.new("TextLabel")
+SubLabel.Size = UDim2.new(1, -50, 1, 0)
+SubLabel.Position = UDim2.new(0, 10, 0, 0)
+SubLabel.BackgroundTransparency = 1
+SubLabel.Text = "Mobile Script"
+SubLabel.TextColor3 = Color3.fromRGB(130, 130, 255)
+SubLabel.Font = Enum.Font.Gotham
+SubLabel.TextSize = 10
+SubLabel.TextXAlignment = Enum.TextXAlignment.Right
+SubLabel.Parent = TitleBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Name = "MinimizeBtn"
+MinimizeBtn.Size = UDim2.new(0, 30, 0, 20)
+MinimizeBtn.Position = UDim2.new(1, -40, 0.5, -10)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 16
+MinimizeBtn.BorderSizePixel = 0
+MinimizeBtn.Parent = TitleBar
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 5)
+MinimizeCorner.Parent = MinimizeBtn
+
+local ContentFrame = Instance.new("ScrollingFrame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, -10, 1, -50)
+ContentFrame.Position = UDim2.new(0, 5, 0, 45)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.BorderSizePixel = 0
+ContentFrame.ScrollBarThickness = 3
+ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 255)
+ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ContentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ContentFrame.Parent = MainFrame
+
+local ContentLayout = Instance.new("UIListLayout")
+ContentLayout.Padding = UDim.new(0, 5)
+ContentLayout.Parent = ContentFrame
+
+local ContentPadding = Instance.new("UIPadding")
+ContentPadding.PaddingTop = UDim.new(0, 5)
+ContentPadding.PaddingLeft = UDim.new(0, 5)
+ContentPadding.PaddingRight = UDim.new(0, 5)
+ContentPadding.Parent = ContentFrame
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, 280, 0, 40)}):Play()
+        ContentFrame.Visible = false
+        MinimizeBtn.Text = "+"
+    else
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = originalSize}):Play()
+        ContentFrame.Visible = true
+        MinimizeBtn.Text = "-"
+    end
+end)
+
+-- =============================================
+-- UI PROTECTION
+-- =============================================
+
+local function ProtectUI()
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if not ScreenGui or not ScreenGui.Parent then
+                pcall(function()
+                    ScreenGui.Parent = PlayerGui
+                end)
+            end
+            if ScreenGui then
+                if not ScreenGui.Enabled then
+                    ScreenGui.Enabled = true
+                end
+                if ScreenGui.DisplayOrder ~= 9999 then
+                    ScreenGui.DisplayOrder = 9999
+                end
+            end
+            if MainFrame then
+                if not MainFrame.Visible then
+                    MainFrame.Visible = true
+                end
+            end
+        end
+    end)
+end
+
+PlayerGui.ChildAdded:Connect(function(child)
+    task.wait(0.2)
+    pcall(function()
+        if not ScreenGui.Parent then
+            ScreenGui.Parent = PlayerGui
+        end
+        ScreenGui.Enabled = true
+        ScreenGui.DisplayOrder = 9999
+        if MainFrame then
+            MainFrame.Visible = true
+        end
+    end)
+end)
+
+LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+    task.wait(0.3)
+    pcall(function()
+        if not ScreenGui.Parent then
+            ScreenGui.Parent = PlayerGui
+        end
+        ScreenGui.Enabled = true
+        ScreenGui.DisplayOrder = 9999
+        if MainFrame then
+            MainFrame.Visible = true
+        end
+    end)
+end)
+
+-- =============================================
+-- UI COMPONENT BUILDERS
+-- =============================================
+
+local function CreateSectionLabel(text)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 30)
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
+    frame.BorderSizePixel = 0
+    frame.Parent = ContentFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(130, 130, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    return frame
+end
+
+local function CreateToggle(labelText, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 36)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 45)
+    frame.BorderSizePixel = 0
+    frame.Parent = ContentFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -60, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local toggleBg = Instance.new("Frame")
+    toggleBg.Size = UDim2.new(0, 44, 0, 22)
+    toggleBg.Position = UDim2.new(1, -52, 0.5, -11)
+    toggleBg.BackgroundColor3 = default and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(60, 60, 80)
+    toggleBg.BorderSizePixel = 0
+    toggleBg.Parent = frame
+
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggleBg
+
+    local toggleKnob = Instance.new("Frame")
+    toggleKnob.Size = UDim2.new(0, 16, 0, 16)
+    toggleKnob.Position = default and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+    toggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    toggleKnob.BorderSizePixel = 0
+    toggleKnob.Parent = toggleBg
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = toggleKnob
+
+    local state = default or false
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = frame
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(toggleBg, TweenInfo.new(0.2), {
+            BackgroundColor3 = state and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(60, 60, 80)
+        }):Play()
+        TweenService:Create(toggleKnob, TweenInfo.new(0.2), {
+            Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+        }):Play()
+        callback(state)
+    end)
+
+    return frame
+end
+
+local function CreateTextbox(labelText, placeholder, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 60)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 45)
+    frame.BorderSizePixel = 0
+    frame.Parent = ContentFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 22)
+    label.Position = UDim2.new(0, 10, 0, 4)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local inputBox = Instance.new("TextBox")
+    inputBox.Size = UDim2.new(1, -20, 0, 26)
+    inputBox.Position = UDim2.new(0, 10, 0, 28)
+    inputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 65)
+    inputBox.Text = ""
+    inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    inputBox.PlaceholderText = placeholder or "Enter value..."
+    inputBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 150)
+    inputBox.Font = Enum.Font.Gotham
+    inputBox.TextSize = 13
+    inputBox.BorderSizePixel = 0
+    inputBox.ClearTextOnFocus = false
+    inputBox.Parent = frame
+
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 5)
+    inputCorner.Parent = inputBox
+
+    inputBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            callback(inputBox.Text)
+        end
+    end)
+
+    return frame
+end
+
+local function CreateButton(labelText, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 36)
+    frame.BackgroundTransparency = 1
+    frame.BorderSizePixel = 0
+    frame.Parent = ContentFrame
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 100)
+    btn.Text = labelText
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.BorderSizePixel = 0
+    btn.Parent = frame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    btn.MouseButton1Click:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(90, 90, 150)}):Play()
+        task.delay(0.15, function()
+            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(60, 60, 100)}):Play()
+        end)
+        callback()
+    end)
+
+    return frame
+end
+
+-- =============================================
+-- BUILD UI SECTIONS
+-- =============================================
+
+CreateSectionLabel("⚡ Player Settings")
+
+CreateToggle("Enable Speed Hack", false, function(state)
+    speedHackEnabled = state
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not state and humanoid then
+        humanoid.WalkSpeed = 16
+        for _, conn in ipairs(speedConnections) do
+            conn:Disconnect()
+        end
+        speedConnections = {}
+    elseif state and humanoid then
+        setupSpeedEnforcement(humanoid)
+    end
+end)
+
+CreateTextbox("WalkSpeed", "Enter speed (default 16)", function(input)
+    local speed = tonumber(input)
+    if speed then
+        desiredSpeed = speed
+        speedHackEnabled = true
+        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        applySpeed(humanoid)
+    end
+end)
+
+CreateSectionLabel("👁 ESP Settings")
+
+CreateButton("Force Refresh ESP", function()
+    RefreshESP()
+end)
+
+CreateSectionLabel("🔧 Game Settings")
+
+CreateToggle("Auto Skillcheck", true, function(state)
+    autoSkillcheckEnabled = state
+    if state then
+        InitializeAutobuy()
+    else
+        if HeartbeatConnection then
+            HeartbeatConnection:Disconnect()
+            HeartbeatConnection = nil
+        end
+        if VisibilityConnection then
+            VisibilityConnection:Disconnect()
+            VisibilityConnection = nil
+        end
+    end
+end)
+
+CreateToggle("Fullbright", true, function(state)
+    fullbrightEnabled = state
+    if not state then
+        Lighting.Ambient = Color3.fromRGB(127, 127, 127)
+        Lighting.OutdoorAmbient = Color3.fromRGB(127, 127, 127)
+        Lighting.Brightness = 1
+        Lighting.ClockTime = 14
+        Lighting.GlobalShadows = true
+        Lighting.FogEnd = 100000
+    end
+end)
+
+CreateButton("Refresh ESP + Map", function()
+    ActiveGenerators = {}
+    RefreshESP()
+end)
 
 -- =============================================
 -- SPEED HACK FUNCTIONS
 -- =============================================
-local function applySpeed(humanoid)
+
+function applySpeed(humanoid)
     if humanoid and speedHackEnabled then
         humanoid.WalkSpeed = desiredSpeed
     end
 end
 
-local function setupEnforcement(humanoid)
-    for _, conn in ipairs(connections) do
+function setupSpeedEnforcement(humanoid)
+    for _, conn in ipairs(speedConnections) do
         conn:Disconnect()
     end
-    connections = {}
+    speedConnections = {}
 
     if humanoid then
         applySpeed(humanoid)
-        table.insert(connections, humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        table.insert(speedConnections, humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
             if speedHackEnabled and humanoid.WalkSpeed ~= desiredSpeed then
                 humanoid.WalkSpeed = desiredSpeed
             end
         end))
-        table.insert(connections, RunService.Heartbeat:Connect(function()
+        table.insert(speedConnections, RunService.Heartbeat:Connect(function()
             if speedHackEnabled and humanoid.WalkSpeed ~= desiredSpeed then
                 humanoid.WalkSpeed = desiredSpeed
             end
@@ -117,41 +519,31 @@ local function setupEnforcement(humanoid)
     end
 end
 
-local function onCharacterAdded(character)
+local function onCharacterAddedSpeed(character)
     local humanoid = character:WaitForChild("Humanoid", 10)
     if humanoid then
-        setupEnforcement(humanoid)
+        setupSpeedEnforcement(humanoid)
     end
 end
 
-if player.Character then
-    onCharacterAdded(player.Character)
+if LocalPlayer.Character then
+    onCharacterAddedSpeed(LocalPlayer.Character)
 end
-player.CharacterAdded:Connect(onCharacterAdded)
 
 -- =============================================
--- CORE FUNCTIONS
+-- CORE ESP FUNCTIONS
 -- =============================================
+
 local function SetupGui()
-    pcall(function()
-        if game:GetService("CoreGui"):FindFirstChild("ChasedInds") then
-            game:GetService("CoreGui"):FindFirstChild("ChasedInds"):Destroy()
-        end
-    end)
-    if PlayerGui:FindFirstChild("ChasedInds") then
-        PlayerGui:FindFirstChild("ChasedInds"):Destroy()
+    if PlayerGui:FindFirstChild("ChasedInds") then 
+        PlayerGui:FindFirstChild("ChasedInds"):Destroy() 
     end
     IndicatorGui = Instance.new("ScreenGui")
     IndicatorGui.Name = "ChasedInds"
     IndicatorGui.IgnoreGuiInset = true
     IndicatorGui.DisplayOrder = 999
     IndicatorGui.ResetOnSpawn = false
-    pcall(function()
-        IndicatorGui.Parent = game:GetService("CoreGui")
-    end)
-    if not IndicatorGui.Parent then
-        IndicatorGui.Parent = PlayerGui
-    end
+    IndicatorGui.Parent = PlayerGui
 end
 
 local function GetGameValue(obj, name)
@@ -167,7 +559,6 @@ local function GetGameValue(obj, name)
 end
 
 local function ApplyHighlight(object, color)
-    if not object or not object.Parent then return end
     local h = object:FindFirstChild("H") or Instance.new("Highlight")
     h.Name = "H"
     h.Adornee = object
@@ -179,17 +570,12 @@ local function ApplyHighlight(object, color)
     h.Parent = object
 end
 
-local function RemoveHighlight(object)
-    if not object then return end
-    local h = object:FindFirstChild("H")
-    if h then h:Destroy() end
-end
-
 local function CreateBillboardTag(text, color, size, textSize)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "BitchHook"
     billboard.AlwaysOnTop = true
     billboard.Size = size or UDim2.new(0, 120, 0, 30)
+
     local label = Instance.new("TextLabel")
     label.Name = "BitchHook"
     label.Size = UDim2.new(1, 0, 1, 0)
@@ -203,11 +589,11 @@ local function CreateBillboardTag(text, color, size, textSize)
     label.TextWrapped = true
     label.RichText = true
     label.Parent = billboard
+
     return billboard
 end
 
 local function updatePlayerNametag(player)
-    if not Features.ESPEnabled or not Features.PlayerESP then return end
     if not IndicatorGui or not IndicatorGui.Parent then return end
     if not player.Character then
         local m = IndicatorGui:FindFirstChild(player.Name) if m then m:Destroy() end
@@ -242,9 +628,9 @@ local function updatePlayerNametag(player)
     end
 
     local baseName = (isKiller and selectedKillerAttr and tostring(selectedKillerAttr) ~= "") and tostring(selectedKillerAttr) or player.Name
+
     local billboard = rootPart:FindFirstChild("BitchHook")
     local nameText = baseName .. "\n[" .. distance .. " studs]"
-
     if not billboard then
         billboard = CreateBillboardTag(nameText, color)
         billboard.Adornee = rootPart
@@ -259,7 +645,6 @@ local function updatePlayerNametag(player)
 
     ApplyHighlight(player.Character, color)
 
-    -- Mask Display
     local hasMask = false
     if isKiller and string.match(tostring(selectedKillerAttr):lower(), "masked") and rawMask then
         local searchMask = tostring(rawMask):lower()
@@ -289,9 +674,8 @@ local function updatePlayerNametag(player)
         if maskBillboard then maskBillboard:Destroy() end
     end
 
-    -- Chased Indicator
     local chasedLabel2D = IndicatorGui:FindFirstChild(player.Name .. "_Chased")
-    if Features.ChasedIndicator and isChased then
+    if isChased then
         local ct3 = billboard:FindFirstChild("ChasedLabel")
         if not ct3 then
             ct3 = Instance.new("TextLabel", billboard)
@@ -314,7 +698,7 @@ local function updatePlayerNametag(player)
             chasedLabel2D.TextSize = 24
             chasedLabel2D.TextStrokeTransparency = 0
             chasedLabel2D.AnchorPoint = Vector2.new(0.5, 0.5)
-            chasedLabel2D.Size = UDim2.new(0, 50, 0, 50)
+            chasedLabel2D.Size = UDim2.new(0, 40, 0, 40)
         end
         chasedLabel2D.Text = "!!"
         chasedLabel2D.TextColor3 = color
@@ -332,13 +716,12 @@ local function updatePlayerNametag(player)
         end
     else
         if chasedLabel2D then chasedLabel2D:Destroy() end
-        local ct3 = billboard:FindFirstChild("ChasedLabel")
+        local ct3 = billboard and billboard:FindFirstChild("ChasedLabel")
         if ct3 then ct3:Destroy() end
     end
 
-    -- Killer Offscreen Arrow
     local killerLabel2D = IndicatorGui:FindFirstChild(player.Name .. "_Killer")
-    if Features.KillerOffscreenArrow and isKiller then
+    if isKiller then
         if not killerLabel2D then
             killerLabel2D = Instance.new("TextLabel", IndicatorGui)
             killerLabel2D.Name = player.Name .. "_Killer"
@@ -370,7 +753,6 @@ local function updatePlayerNametag(player)
 end
 
 local function updateGeneratorProgress(generator)
-    if not Features.GeneratorESP then return false end
     if not generator or not generator.Parent then return true end
     local percent = GetGameValue(generator, "RepairProgress") or GetGameValue(generator, "Progress") or 0
 
@@ -382,11 +764,11 @@ local function updateGeneratorProgress(generator)
     end
 
     local cp = math.clamp(percent, 0, 100)
-    local finalColor = cp < 50
-        and Config.Objects.Generator.Color:Lerp(Color3.fromRGB(180, 180, 0), cp / 50)
+    local finalColor = cp < 50 
+        and Config.Objects.Generator.Color:Lerp(Color3.fromRGB(180, 180, 0), cp / 50) 
         or Color3.fromRGB(180, 180, 0):Lerp(Color3.fromRGB(0, 150, 0), (cp - 50) / 50)
-    local percentStr = string.format("[%.2f%%]", percent)
 
+    local percentStr = string.format("[%.2f%%]", percent)
     if not billboard then
         billboard = CreateBillboardTag(percentStr, finalColor)
         billboard.Name = "GenBitchHook"
@@ -404,7 +786,6 @@ local function updateGeneratorProgress(generator)
 end
 
 local function updateNextKillerDisplay()
-    if not Features.NextKillerDisplay then return end
     if not IndicatorGui or not IndicatorGui.Parent then return end
     local label = IndicatorGui:FindFirstChild("NextKillerDisplay")
     local teamName = (LocalPlayer.Team and LocalPlayer.Team.Name:lower()) or ""
@@ -423,48 +804,43 @@ local function updateNextKillerDisplay()
             label.RichText = true
             label.Text = "Next Killer: Calculating..."
         end
-        local allPlayers = Players:GetPlayers()
-        table.sort(allPlayers, function(a, b)
+        local players = Players:GetPlayers()
+        table.sort(players, function(a, b)
             local aA = GetGameValue(a, "AllowKiller") or false
             local bA = GetGameValue(b, "AllowKiller") or false
             if aA ~= bA then return aA == true end
             return (GetGameValue(a, "KillerChance") or 0) > (GetGameValue(b, "KillerChance") or 0)
         end)
-        local nk = allPlayers[1]
+        local nk = players[1]
         if nk then
-            label.Text = "Next Killer: <font color=\"rgb(255,0,0)\">" ..
-                (nk == LocalPlayer and "YOU" or tostring(GetGameValue(nk, "SelectedKiller") or nk.Name)) ..
-                "</font>"
+            label.Text = "Next Killer: <font color=\"rgb(255,0,0)\">" .. (nk == LocalPlayer and "YOU" or tostring(GetGameValue(nk, "SelectedKiller") or nk.Name)) .. "</font>"
         end
     elseif label then
         label:Destroy()
     end
 end
 
-local function RefreshESP()
-    if not Features.ESPEnabled then return end
+function RefreshESP()
     ActiveGenerators = {}
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "Window" and Features.WindowESP then
-            ApplyHighlight(obj, Config.Objects.Window.Color)
-        end
+        if obj.Name == "Window" then ApplyHighlight(obj, Config.Objects.Window.Color) end
     end
     local Map = workspace:FindFirstChild("Map")
     if not Map then return end
     for _, obj in ipairs(Map:GetDescendants()) do
-        if obj.Name == "Generator" and Features.GeneratorESP then
+        if obj.Name == "Generator" then
             ApplyHighlight(obj, Config.Objects.Generator.Color)
             table.insert(ActiveGenerators, obj)
-        elseif obj.Name == "Hook" and Features.HookESP then
+        elseif obj.Name == "Hook" then
             local m = obj:FindFirstChild("Model")
             if m then
                 for _, p in ipairs(m:GetDescendants()) do
                     if p:IsA("MeshPart") then ApplyHighlight(p, Config.Objects.Hook.Color) end
                 end
             end
-        elseif (obj.Name == "Palletwrong" or obj.Name == "Pallet") and Features.PalletESP then
+        elseif obj.Name == "Palletwrong" or obj.Name == "Pallet" then
             ApplyHighlight(obj, Config.Objects.Pallet.Color)
-        elseif obj.Name == "Gate" and Features.GateESP then
+        elseif obj.Name == "Gate" then
             ApplyHighlight(obj, Config.Objects.Gate.Color)
         end
     end
@@ -482,8 +858,7 @@ local function TriggerMobileButton()
     local b = GetActionTarget()
     if b and b:IsA("GuiObject") then
         local p, s, i = b.AbsolutePosition, b.AbsoluteSize, GuiService:GetGuiInset()
-        local cx = p.X + (s.X / 2) + i.X
-        local cy = p.Y + (s.Y / 2) + i.Y
+        local cx, cy = p.X + (s.X / 2) + i.X, p.Y + (s.Y / 2) + i.Y
         pcall(function()
             VirtualInputManager:SendTouchEvent(TouchID, 0, cx, cy)
             task.wait(0.01)
@@ -492,29 +867,23 @@ local function TriggerMobileButton()
     end
 end
 
-local function InitializeAutobuy()
-    if not Features.AutoSkillCheck then return end
+function InitializeAutobuy()
+    if not autoSkillcheckEnabled then return end
     task.spawn(function()
         local prompt = PlayerGui:WaitForChild("SkillCheckPromptGui", 10)
         local check = prompt and prompt:WaitForChild("Check", 10)
         if not check then return end
-        local line = check:WaitForChild("Line")
-        local goal = check:WaitForChild("Goal")
+        local line, goal = check:WaitForChild("Line"), check:WaitForChild("Goal")
         if VisibilityConnection then VisibilityConnection:Disconnect() end
         VisibilityConnection = check:GetPropertyChangedSignal("Visible"):Connect(function()
-            if LocalPlayer.Team and LocalPlayer.Team.Name == "Survivors" and check.Visible and Features.AutoSkillCheck then
+            if LocalPlayer.Team and LocalPlayer.Team.Name == "Survivors" and check.Visible and autoSkillcheckEnabled then
                 if HeartbeatConnection then HeartbeatConnection:Disconnect() end
                 HeartbeatConnection = RunService.Heartbeat:Connect(function()
-                    local lr = line.Rotation % 360
-                    local gr = goal.Rotation % 360
-                    local ss = (gr + 101) % 360
-                    local se = (gr + 115) % 360
+                    local lr, gr = line.Rotation % 360, goal.Rotation % 360
+                    local ss, se = (gr + 101) % 360, (gr + 115) % 360
                     if (ss > se and (lr >= ss or lr <= se)) or (lr >= ss and lr <= se) then
                         TriggerMobileButton()
-                        if HeartbeatConnection then
-                            HeartbeatConnection:Disconnect()
-                            HeartbeatConnection = nil
-                        end
+                        if HeartbeatConnection then HeartbeatConnection:Disconnect() HeartbeatConnection = nil end
                     end
                 end)
             elseif HeartbeatConnection then
@@ -526,379 +895,9 @@ local function InitializeAutobuy()
 end
 
 -- =============================================
--- RAYFIELD WINDOW
+-- CONNECTIONS
 -- =============================================
-local Window = Rayfield:CreateWindow({
-    Name = "Yutzz",
-    LoadingTitle = "VD",
-    LoadingSubtitle = "by Yutzz",
-    Theme = "Default",
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "DBRHub",
-        FileName = "Config"
-    },
-    Discord = {
-        Enabled = false,
-    },
-    KeySystem = false,
-})
 
--- =============================================
--- TAB: ESP
--- =============================================
-local ESPTab = Window:CreateTab("ESP", 4483345998)
-
-ESPTab:CreateToggle({
-    Name = "Master ESP",
-    CurrentValue = true,
-    Flag = "MasterESP",
-    Callback = function(val)
-        Features.ESPEnabled = val
-        if val then RefreshESP() end
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Player ESP",
-    CurrentValue = true,
-    Flag = "PlayerESP",
-    Callback = function(val)
-        Features.PlayerESP = val
-        if not val then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character then
-                    RemoveHighlight(p.Character)
-                    local root = p.Character:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        local bb = root:FindFirstChild("BitchHook")
-                        if bb then bb:Destroy() end
-                    end
-                end
-            end
-        end
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Generator ESP",
-    CurrentValue = true,
-    Flag = "GeneratorESP",
-    Callback = function(val)
-        Features.GeneratorESP = val
-        RefreshESP()
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Hook ESP",
-    CurrentValue = true,
-    Flag = "HookESP",
-    Callback = function(val)
-        Features.HookESP = val
-        RefreshESP()
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Pallet ESP",
-    CurrentValue = true,
-    Flag = "PalletESP",
-    Callback = function(val)
-        Features.PalletESP = val
-        RefreshESP()
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Window ESP",
-    CurrentValue = true,
-    Flag = "WindowESP",
-    Callback = function(val)
-        Features.WindowESP = val
-        RefreshESP()
-    end
-})
-
-ESPTab:CreateToggle({
-    Name = "Gate ESP",
-    CurrentValue = true,
-    Flag = "GateESP",
-    Callback = function(val)
-        Features.GateESP = val
-        RefreshESP()
-    end
-})
-
-ESPTab:CreateButton({
-    Name = "Refresh ESP",
-    Callback = function()
-        RefreshESP()
-        Rayfield:Notify({
-            Title = "ESP",
-            Content = "ESP Refreshed Successfully!",
-            Duration = 3,
-            Image = 4483345998,
-        })
-    end
-})
-
--- =============================================
--- TAB: PLAYERS
--- =============================================
-local PlayersTab = Window:CreateTab("Players", 4483345998)
-
-PlayersTab:CreateToggle({
-    Name = "Killer Warning",
-    CurrentValue = true,
-    Flag = "KillerWarn",
-    Callback = function(val)
-        Features.KillerWarning = val
-        if not val and LocalPlayer.Character then
-            local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local warn = root:FindFirstChild("KillerWarn")
-                if warn then warn:Destroy() end
-            end
-        end
-    end
-})
-
-PlayersTab:CreateToggle({
-    Name = "Chased Indicator",
-    CurrentValue = true,
-    Flag = "ChasedInd",
-    Callback = function(val)
-        Features.ChasedIndicator = val
-    end
-})
-
-PlayersTab:CreateToggle({
-    Name = "Killer Off Screen Arrow",
-    CurrentValue = true,
-    Flag = "KillerArrow",
-    Callback = function(val)
-        Features.KillerOffscreenArrow = val
-    end
-})
-
-PlayersTab:CreateToggle({
-    Name = "Next Killer Display",
-    CurrentValue = true,
-    Flag = "NextKiller",
-    Callback = function(val)
-        Features.NextKillerDisplay = val
-        if not val and IndicatorGui then
-            local lbl = IndicatorGui:FindFirstChild("NextKillerDisplay")
-            if lbl then lbl:Destroy() end
-        end
-    end
-})
-
--- =============================================
--- TAB: SPEED
--- =============================================
-local SpeedTab = Window:CreateTab("Speed", 4483345998)
-
-SpeedTab:CreateParagraph({
-    Title = "Speed Hack",
-    Content = "Set your walk speed. Toggle to enable or disable. Default speed is 16."
-})
-
-SpeedTab:CreateSlider({
-    Name = "Walk Speed",
-    Range = {16, 500},
-    Increment = 1,
-    Suffix = "Speed",
-    CurrentValue = 16,
-    Flag = "WalkSpeedSlider",
-    Callback = function(val)
-        desiredSpeed = val
-        if speedHackEnabled then
-            local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-            applySpeed(humanoid)
-        end
-    end
-})
-
-SpeedTab:CreateInput({
-    Name = "Custom Speed Value",
-    PlaceholderText = "Enter speed number...",
-    RemoveTextAfterFocusLost = false,
-    Flag = "CustomSpeed",
-    Callback = function(input)
-        local speed = tonumber(input)
-        if speed then
-            desiredSpeed = speed
-            speedHackEnabled = true
-            local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-            applySpeed(humanoid)
-            Rayfield:Notify({
-                Title = "Speed",
-                Content = "Speed set to " .. tostring(speed),
-                Duration = 3,
-                Image = 4483345998,
-            })
-        else
-            Rayfield:Notify({
-                Title = "Speed Error",
-                Content = "Please enter a valid number!",
-                Duration = 3,
-                Image = 4483345998,
-            })
-        end
-    end
-})
-
-SpeedTab:CreateToggle({
-    Name = "Enable Speed Hack",
-    CurrentValue = false,
-    Flag = "SpeedHackToggle",
-    Callback = function(state)
-        speedHackEnabled = state
-        local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if not state and humanoid then
-            humanoid.WalkSpeed = 16
-            for _, conn in ipairs(connections) do
-                conn:Disconnect()
-            end
-            connections = {}
-            Rayfield:Notify({
-                Title = "Speed",
-                Content = "Speed Hack Disabled. Reset to 16.",
-                Duration = 3,
-                Image = 4483345998,
-            })
-        elseif state and humanoid then
-            setupEnforcement(humanoid)
-            Rayfield:Notify({
-                Title = "Speed",
-                Content = "Speed Hack Enabled! Speed: " .. tostring(desiredSpeed),
-                Duration = 3,
-                Image = 4483345998,
-            })
-        end
-    end
-})
-
-SpeedTab:CreateButton({
-    Name = "Reset Speed",
-    Callback = function()
-        speedHackEnabled = false
-        desiredSpeed = 16
-        local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = 16
-        end
-        for _, conn in ipairs(connections) do
-            conn:Disconnect()
-        end
-        connections = {}
-        Rayfield:Notify({
-            Title = "Speed",
-            Content = "Speed Reset to 16!",
-            Duration = 3,
-            Image = 4483345998,
-        })
-    end
-})
-
--- =============================================
--- TAB: WORLD
--- =============================================
-local WorldTab = Window:CreateTab("World", 4483345998)
-
-WorldTab:CreateToggle({
-    Name = "Full Bright",
-    CurrentValue = true,
-    Flag = "FullBright",
-    Callback = function(val)
-        Features.FullBright = val
-        if not val then
-            Lighting.Ambient = Color3.fromRGB(70, 70, 70)
-            Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
-            Lighting.Brightness = 1
-            Lighting.ClockTime = 14
-            Lighting.GlobalShadows = true
-            Lighting.FogEnd = 100000
-        end
-    end
-})
-
-WorldTab:CreateSlider({
-    Name = "Brightness",
-    Range = {0, 5},
-    Increment = 0.1,
-    Suffix = "Brightness",
-    CurrentValue = 2,
-    Flag = "BrightnessSlider",
-    Callback = function(val)
-        Lighting.Brightness = val
-    end
-})
-
-WorldTab:CreateSlider({
-    Name = "Clock Time",
-    Range = {0, 24},
-    Increment = 0.5,
-    Suffix = "Hour",
-    CurrentValue = 14,
-    Flag = "ClockSlider",
-    Callback = function(val)
-        Lighting.ClockTime = val
-    end
-})
-
--- =============================================
--- TAB: AUTO
--- =============================================
-local AutoTab = Window:CreateTab("Auto", 4483345998)
-
-AutoTab:CreateToggle({
-    Name = "Auto Skill Check",
-    CurrentValue = true,
-    Flag = "AutoSkill",
-    Callback = function(val)
-        Features.AutoSkillCheck = val
-        if val then
-            InitializeAutobuy()
-        else
-            if HeartbeatConnection then HeartbeatConnection:Disconnect() HeartbeatConnection = nil end
-            if VisibilityConnection then VisibilityConnection:Disconnect() VisibilityConnection = nil end
-        end
-    end
-})
-
-AutoTab:CreateParagraph({
-    Title = "Auto Skill Hits",
-    Content = "Automatically hits skill checks for survivors if you have bad ping can miss"
-})
-
--- =============================================
--- TAB: INFO
--- =============================================
-local InfoTab = Window:CreateTab("Info", 4483345998)
-
-InfoTab:CreateParagraph({
-    Title = "Yutzz Beta",
-    Content = "This script still have bug."
-})
-
-InfoTab:CreateParagraph({
-    Title = "Features",
-    Content = "Esp| Speed Hack | Auto Skill Check | Full Bright | Killer Warning | Chased Indicator | Off Screen Arrows | Next Killer Display"
-})
-
-InfoTab:CreateParagraph({
-    Title = "Version",
-    Content = "v1.0 - Yutzz | script free"
-})
-
--- =============================================
--- EVENTS
--- =============================================
 workspace.ChildAdded:Connect(function(c)
     if c.Name == "Map" then
         task.wait(1)
@@ -912,19 +911,17 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     SetupGui()
     task.wait(1)
     InitializeAutobuy()
-    -- Re-apply speed on respawn
-    local humanoid = char:WaitForChild("Humanoid", 10)
-    if humanoid and speedHackEnabled then
-        setupEnforcement(humanoid)
-    end
+    onCharacterAddedSpeed(char)
 end)
+
+LocalPlayer.CharacterAdded:Connect(onCharacterAddedSpeed)
 
 RunService.Heartbeat:Connect(function()
     local now = tick()
     if now - LastUpdateTick < 0.05 then return end
     LastUpdateTick = now
 
-    if Features.FullBright then
+    if fullbrightEnabled then
         Lighting.Ambient = Color3.fromRGB(255, 255, 255)
         Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
         Lighting.Brightness = 2
@@ -956,7 +953,7 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    if myRoot and Features.KillerWarning then
+    if myRoot then
         local warn = myRoot:FindFirstChild("KillerWarn")
         if killerNearby then
             if not warn then
@@ -983,8 +980,8 @@ end)
 
 Players.PlayerRemoving:Connect(function(p)
     if not IndicatorGui then return end
-    local names = {p.Name .. "_Chased", p.Name .. "_Killer", p.Name}
-    for _, n in ipairs(names) do
+    local l = {p.Name .. "_Chased", p.Name .. "_Killer", p.Name}
+    for _, n in ipairs(l) do
         local obj = IndicatorGui:FindFirstChild(n)
         if obj then obj:Destroy() end
     end
@@ -993,13 +990,8 @@ end)
 -- =============================================
 -- INIT
 -- =============================================
+
 SetupGui()
 RefreshESP()
 InitializeAutobuy()
-
-Rayfield:Notify({
-    Title = "Loaded!",
-    Content = "Yutzz vd v1.0 Loaded!",
-    Duration = 5,
-    Image = 4483345998,
-})
+ProtectUI()
