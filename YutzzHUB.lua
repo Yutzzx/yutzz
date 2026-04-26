@@ -103,21 +103,37 @@ local Window = Axion:CreateWindow({
 })
 
 
--- Force compact size for OPPO A31 (720x1600) and similar mobile screens
-task.spawn(function()
-    task.wait(1)
-    pcall(function()
-        for _, sg in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-            if sg:IsA("ScreenGui") and sg.Name ~= "ChasedInds" then
-                for _, child in ipairs(sg:GetChildren()) do
-                    if child:IsA("Frame") and child.Size.X.Offset > 150 then
-                        child.Size = UDim2.new(0, 260, 0, 320)
-                        child.Position = UDim2.new(0, 5, 0.5, -160)
-                    end
+-- =============================================
+-- FIXED AXION UI SCALING (MOBILE SAFE)
+-- =============================================
+
+local function FixAxionUI()
+    for _, v in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if v:IsA("TextLabel") and v.Text == "Yutzz HUB" then
+            local frame = v.Parent
+
+            -- find main container
+            while frame and not frame:IsA("ScreenGui") do
+                if frame:IsA("Frame") and frame.Size.X.Scale > 0.3 then
+                    -- 🔥 APPLY FIX HERE
+                    frame.Size = UDim2.new(0.35, 0, 0.5, 0)
+                    frame.Position = UDim2.new(0.02, 0, 0.5, 0)
+                    frame.AnchorPoint = Vector2.new(0, 0.5)
+
+                    return
                 end
+                frame = frame.Parent
             end
         end
-    end)
+    end
+end
+
+-- run fix multiple times (Axion loads late sometimes)
+task.spawn(function()
+    for i = 1, 5 do
+        task.wait(0.7)
+        pcall(FixAxionUI)
+    end
 end)
 -- Manually inject minimize button into Axion title bar (mobile fix)
 task.spawn(function()
