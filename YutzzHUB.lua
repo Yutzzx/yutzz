@@ -1,6 +1,3 @@
--- Yutzz HUB Script using Axion UI Library
--- Hitbox ESP is transparent (invisible but functional)
-
 local Axion = loadstring(game:HttpGet("https://raw.githubusercontent.com/adamowaissi22-boop/Axom-Scripts-/refs/heads/main/Axion%20Ui%20Library"))()
 
 -- =============================================
@@ -105,40 +102,70 @@ local Window = Axion:CreateWindow({
     ShowMinimize   = true
 })
 
+
+-- Force compact size for OPPO A31 (720x1600) and similar mobile screens
+task.spawn(function()
+    task.wait(1)
+    pcall(function()
+        for _, sg in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if sg:IsA("ScreenGui") and sg.Name ~= "ChasedInds" then
+                for _, child in ipairs(sg:GetChildren()) do
+                    if child:IsA("Frame") and child.Size.X.Offset > 150 then
+                        child.Size = UDim2.new(0, 260, 0, 320)
+                        child.Position = UDim2.new(0, 5, 0.5, -160)
+                    end
+                end
+            end
+        end
+    end)
+end)
 -- Manually inject minimize button into Axion title bar (mobile fix)
 task.spawn(function()
-    task.wait(1.5)
+    task.wait(2)
     pcall(function()
-        local axionGui = nil
-        for _, sg in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-            if sg:IsA("ScreenGui") and sg.Name ~= "VDMobileUI" and sg.Name ~= "ChasedInds" then
-                axionGui = sg
-                break
-            end
-        end
-        if not axionGui then return end
-
-        -- Find the main window frame
-        local mainFrame = nil
-        for _, child in ipairs(axionGui:GetDescendants()) do
-            if child:IsA("Frame") and child.Size.X.Offset > 200 then
-                mainFrame = child
-                break
-            end
-        end
-        if not mainFrame then return end
-
-        -- Find the title bar (first Frame child)
+        -- Search ALL ScreenGuis for any TextLabel containing the hub name
         local titleBar = nil
-        for _, child in ipairs(mainFrame:GetChildren()) do
-            if child:IsA("Frame") and child.Size.Y.Offset < 60 then
-                titleBar = child
+        local mainFrame = nil
+
+        for _, sg in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
+            if sg:IsA("TextLabel") and sg.Text == "Yutzz HUB" then
+                -- Walk up to find the title bar frame and main frame
+                local bar = sg.Parent
+                while bar and not bar:IsA("ScreenGui") do
+                    if bar:IsA("Frame") and bar.Size.Y.Offset < 80 then
+                        titleBar = bar
+                    end
+                    if bar:IsA("Frame") and bar.Size.X.Offset > 200 and bar.Size.Y.Offset > 200 then
+                        mainFrame = bar
+                        break
+                    end
+                    bar = bar.Parent
+                end
                 break
             end
         end
-        if not titleBar then return end
 
-        -- Check if minimize button already exists
+        if not titleBar or not mainFrame then
+            -- Fallback: grab the biggest Frame in any ScreenGui
+            for _, sg in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+                if sg:IsA("ScreenGui") and sg.Name ~= "ChasedInds" then
+                    for _, child in ipairs(sg:GetChildren()) do
+                        if child:IsA("Frame") and child.Size.X.Offset > 200 then
+                            mainFrame = child
+                            for _, sub in ipairs(child:GetChildren()) do
+                                if sub:IsA("Frame") then
+                                    titleBar = sub
+                                    break
+                                end
+                            end
+                            break
+                        end
+                    end
+                end
+            end
+        end
+
+        if not titleBar or not mainFrame then return end
         if titleBar:FindFirstChild("YutzzMinBtn") then return end
 
         local isMinimized = false
@@ -152,15 +179,15 @@ task.spawn(function()
 
         local minBtn = Instance.new("TextButton")
         minBtn.Name = "YutzzMinBtn"
-        minBtn.Size = UDim2.new(0, 28, 0, 20)
-        minBtn.Position = UDim2.new(1, -34, 0.5, -10)
+        minBtn.Size = UDim2.new(0, 32, 0, 22)
+        minBtn.Position = UDim2.new(1, -38, 0.5, -11)
         minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
         minBtn.Text = "—"
         minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
         minBtn.Font = Enum.Font.GothamBold
-        minBtn.TextSize = 14
+        minBtn.TextSize = 16
         minBtn.BorderSizePixel = 0
-        minBtn.ZIndex = 999
+        minBtn.ZIndex = 9999
         minBtn.Parent = titleBar
 
         local corner = Instance.new("UICorner")
@@ -170,22 +197,25 @@ task.spawn(function()
         minBtn.MouseButton1Click:Connect(function()
             isMinimized = not isMinimized
             if isMinimized then
-                TweenService:Create(mainFrame, TweenInfo.new(0.25), {
-                    Size = UDim2.new(0, mainFrame.Size.X.Offset, 0, titleBar.Size.Y.Offset)
-                }):Play()
                 for _, f in ipairs(contentFrames) do
                     f.Visible = false
                 end
+                TweenService:Create(mainFrame, TweenInfo.new(0.2), {
+                    Size = UDim2.new(0, mainFrame.Size.X.Offset, 0, titleBar.AbsoluteSize.Y)
+                }):Play()
                 minBtn.Text = "+"
             else
+                TweenService:Create(mainFrame, TweenInfo.new(0.2), {
+                    Size = originalSize
+                }):Play()
+                task.wait(0.2)
                 for _, f in ipairs(contentFrames) do
                     f.Visible = true
                 end
-                TweenService:Create(mainFrame, TweenInfo.new(0.25), {
-                    Size = originalSize
-                }):Play()
                 minBtn.Text = "—"
             end
+            -- Sync with the settings button state
+            _minIsHidden = isMinimized
         end)
     end)
 end)
@@ -989,10 +1019,38 @@ local destroyButton = SettingsSection:CreateButton({
     end
 })
 
+-- Shared minimize state and function
+local _minIsHidden = false
+local _axionMainFrame = nil
+
+local function findAxionMainFrame()
+    if _axionMainFrame and _axionMainFrame.Parent then return _axionMainFrame end
+    for _, sg in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if sg:IsA("TextLabel") and sg.Text == "Yutzz HUB" then
+            local p = sg.Parent
+            while p and not p:IsA("ScreenGui") do
+                if p:IsA("Frame") and p.Size.X.Offset > 200 and p.Size.Y.Offset > 200 then
+                    _axionMainFrame = p
+                    return p
+                end
+                p = p.Parent
+            end
+        end
+    end
+    return nil
+end
+
+local function doMinimize()
+    local frame = findAxionMainFrame()
+    if not frame then return end
+    _minIsHidden = not _minIsHidden
+    frame.Visible = not _minIsHidden
+end
+
 local minimizeButton = SettingsSection:CreateButton({
     Name     = "Minimize / Show UI",
     Callback = function()
-        Window:Toggle()
+        doMinimize()
     end
 })
 
@@ -1003,7 +1061,7 @@ local toggleKeybind = KeybindSection:CreateKeybind({
     CurrentKeybind = "RightShift",
     Flag           = "ToggleKey",
     Callback       = function()
-        Window:Toggle()
+        doMinimize()
     end
 })
 
