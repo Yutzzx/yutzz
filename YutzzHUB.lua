@@ -102,15 +102,93 @@ local Window = Axion:CreateWindow({
     RippleEnabled  = true,
     CornerRadius   = 8,
     ToggleKey      = Enum.KeyCode.RightShift,
-    Size           = UDim2.new(0, 300, 0, 420),
     ShowMinimize   = true
 })
 
--- Scale down UI for mobile screens
-local screenSize = workspace.CurrentCamera.ViewportSize
-if screenSize.X < 900 then
-    pcall(function() Window:SetSize(UDim2.new(0, 280, 0, 400)) end)
-end
+-- Manually inject minimize button into Axion title bar (mobile fix)
+task.spawn(function()
+    task.wait(1.5)
+    pcall(function()
+        local axionGui = nil
+        for _, sg in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+            if sg:IsA("ScreenGui") and sg.Name ~= "VDMobileUI" and sg.Name ~= "ChasedInds" then
+                axionGui = sg
+                break
+            end
+        end
+        if not axionGui then return end
+
+        -- Find the main window frame
+        local mainFrame = nil
+        for _, child in ipairs(axionGui:GetDescendants()) do
+            if child:IsA("Frame") and child.Size.X.Offset > 200 then
+                mainFrame = child
+                break
+            end
+        end
+        if not mainFrame then return end
+
+        -- Find the title bar (first Frame child)
+        local titleBar = nil
+        for _, child in ipairs(mainFrame:GetChildren()) do
+            if child:IsA("Frame") and child.Size.Y.Offset < 60 then
+                titleBar = child
+                break
+            end
+        end
+        if not titleBar then return end
+
+        -- Check if minimize button already exists
+        if titleBar:FindFirstChild("YutzzMinBtn") then return end
+
+        local isMinimized = false
+        local originalSize = mainFrame.Size
+        local contentFrames = {}
+        for _, child in ipairs(mainFrame:GetChildren()) do
+            if child ~= titleBar then
+                table.insert(contentFrames, child)
+            end
+        end
+
+        local minBtn = Instance.new("TextButton")
+        minBtn.Name = "YutzzMinBtn"
+        minBtn.Size = UDim2.new(0, 28, 0, 20)
+        minBtn.Position = UDim2.new(1, -34, 0.5, -10)
+        minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+        minBtn.Text = "—"
+        minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        minBtn.Font = Enum.Font.GothamBold
+        minBtn.TextSize = 14
+        minBtn.BorderSizePixel = 0
+        minBtn.ZIndex = 999
+        minBtn.Parent = titleBar
+
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 5)
+        corner.Parent = minBtn
+
+        minBtn.MouseButton1Click:Connect(function()
+            isMinimized = not isMinimized
+            if isMinimized then
+                TweenService:Create(mainFrame, TweenInfo.new(0.25), {
+                    Size = UDim2.new(0, mainFrame.Size.X.Offset, 0, titleBar.Size.Y.Offset)
+                }):Play()
+                for _, f in ipairs(contentFrames) do
+                    f.Visible = false
+                end
+                minBtn.Text = "+"
+            else
+                for _, f in ipairs(contentFrames) do
+                    f.Visible = true
+                end
+                TweenService:Create(mainFrame, TweenInfo.new(0.25), {
+                    Size = originalSize
+                }):Play()
+                minBtn.Text = "—"
+            end
+        end)
+    end)
+end)
 
 -- =============================================
 -- TABS
