@@ -1,9 +1,3 @@
-local Axion = loadstring(game:HttpGet("https://raw.githubusercontent.com/adamowaissi22-boop/Axom-Scripts-/refs/heads/main/Axion%20Ui%20Library"))()
-
--- =============================================
--- CONFIG
--- =============================================
-
 local Config = {
     Players = {
         Killer   = {Color = Color3.fromRGB(255, 93, 108)},
@@ -40,10 +34,6 @@ local MaskColors = {
     ["Alex"]    = Color3.fromRGB(255, 255, 255)
 }
 
--- =============================================
--- SERVICES
--- =============================================
-
 local Players             = game:GetService("Players")
 local RunService          = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -54,16 +44,11 @@ local TweenService        = game:GetService("TweenService")
 local LocalPlayer   = Players.LocalPlayer
 local PlayerGui     = LocalPlayer:WaitForChild("PlayerGui")
 
--- =============================================
--- STATE
--- =============================================
-
 local ActiveGenerators  = {}
 local LastUpdateTick    = 0
 local LastFullESPRefresh= 0
 local OriginalHitboxSizes = {}
 
--- Hitbox ESP drawing (transparent — still shows outline only, no fill)
 local HitboxESPBoxes    = {}
 local ESPDrawingEnabled = false
 
@@ -78,172 +63,7 @@ local desiredSpeed         = 16
 local speedConnections     = {}
 local autoSkillcheckEnabled= true
 local fullbrightEnabled    = true
-
--- =============================================
--- AXION WINDOW
--- =============================================
-
-local Window = Axion:CreateWindow({
-    Name              = "Yutzz HUB",
-    Subtitle          = "Mobile Script",
-    Version           = "v2.0",
-    LoadingTitle      = "Yutzz HUB",
-    LoadingSubtitle   = "Loading modules...",
-    Theme             = "Default",
-    ConfigurationSaving = {
-        Enabled    = true,
-        FolderName = "YutzzConfig",
-        FileName   = "YutzzSettings"
-    },
-    AnimationSpeed = 0.3,
-    RippleEnabled  = true,
-    CornerRadius   = 8,
-    ToggleKey      = Enum.KeyCode.RightShift,
-    ShowMinimize   = true
-})
-
-
--- =============================================
--- FIXED AXION UI SCALING (MOBILE SAFE)
--- =============================================
-
-local function FixAxionUI()
-    for _, v in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
-        if v:IsA("TextLabel") and v.Text == "Yutzz HUB" then
-            local frame = v.Parent
-
-            -- find main container
-            while frame and not frame:IsA("ScreenGui") do
-                if frame:IsA("Frame") and frame.Size.X.Scale > 0.3 then
-                    -- 🔥 APPLY FIX HERE
-                    frame.Size = UDim2.new(0.35, 0, 0.5, 0)
-                    frame.Position = UDim2.new(0.02, 0, 0.5, 0)
-                    frame.AnchorPoint = Vector2.new(0, 0.5)
-
-                    return
-                end
-                frame = frame.Parent
-            end
-        end
-    end
-end
-
--- run fix multiple times (Axion loads late sometimes)
-task.spawn(function()
-    for i = 1, 5 do
-        task.wait(0.7)
-        pcall(FixAxionUI)
-    end
-end)
--- Manually inject minimize button into Axion title bar (mobile fix)
-task.spawn(function()
-    task.wait(2)
-    pcall(function()
-        -- Search ALL ScreenGuis for any TextLabel containing the hub name
-        local titleBar = nil
-        local mainFrame = nil
-
-        for _, sg in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
-            if sg:IsA("TextLabel") and sg.Text == "Yutzz HUB" then
-                -- Walk up to find the title bar frame and main frame
-                local bar = sg.Parent
-                while bar and not bar:IsA("ScreenGui") do
-                    if bar:IsA("Frame") and bar.Size.Y.Offset < 80 then
-                        titleBar = bar
-                    end
-                    if bar:IsA("Frame") and bar.Size.X.Offset > 200 and bar.Size.Y.Offset > 200 then
-                        mainFrame = bar
-                        break
-                    end
-                    bar = bar.Parent
-                end
-                break
-            end
-        end
-
-        if not titleBar or not mainFrame then
-            -- Fallback: grab the biggest Frame in any ScreenGui
-            for _, sg in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-                if sg:IsA("ScreenGui") and sg.Name ~= "ChasedInds" then
-                    for _, child in ipairs(sg:GetChildren()) do
-                        if child:IsA("Frame") and child.Size.X.Offset > 200 then
-                            mainFrame = child
-                            for _, sub in ipairs(child:GetChildren()) do
-                                if sub:IsA("Frame") then
-                                    titleBar = sub
-                                    break
-                                end
-                            end
-                            break
-                        end
-                    end
-                end
-            end
-        end
-
-        if not titleBar or not mainFrame then return end
-        if titleBar:FindFirstChild("YutzzMinBtn") then return end
-
-        local isMinimized = false
-        local originalSize = mainFrame.Size
-        local contentFrames = {}
-        for _, child in ipairs(mainFrame:GetChildren()) do
-            if child ~= titleBar then
-                table.insert(contentFrames, child)
-            end
-        end
-
-        local minBtn = Instance.new("TextButton")
-        minBtn.Name = "YutzzMinBtn"
-        minBtn.Size = UDim2.new(0, 32, 0, 22)
-        minBtn.Position = UDim2.new(1, -38, 0.5, -11)
-        minBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-        minBtn.Text = "—"
-        minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        minBtn.Font = Enum.Font.GothamBold
-        minBtn.TextSize = 16
-        minBtn.BorderSizePixel = 0
-        minBtn.ZIndex = 9999
-        minBtn.Parent = titleBar
-
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 5)
-        corner.Parent = minBtn
-
-        minBtn.MouseButton1Click:Connect(function()
-            isMinimized = not isMinimized
-            if isMinimized then
-                for _, f in ipairs(contentFrames) do
-                    f.Visible = false
-                end
-                TweenService:Create(mainFrame, TweenInfo.new(0.2), {
-                    Size = UDim2.new(0, mainFrame.Size.X.Offset, 0, titleBar.AbsoluteSize.Y)
-                }):Play()
-                minBtn.Text = "+"
-            else
-                TweenService:Create(mainFrame, TweenInfo.new(0.2), {
-                    Size = originalSize
-                }):Play()
-                task.wait(0.2)
-                for _, f in ipairs(contentFrames) do
-                    f.Visible = true
-                end
-                minBtn.Text = "—"
-            end
-            -- Sync with the settings button state
-            _minIsHidden = isMinimized
-        end)
-    end)
-end)
-
--- =============================================
--- TABS
--- =============================================
-
-local PlayerTab  = Window:CreateTab({Name = "Player",  Icon = "⚡"})
-local HitboxTab  = Window:CreateTab({Name = "Hitbox",  Icon = "🎯"})
-local GameTab    = Window:CreateTab({Name = "Game",    Icon = "🔧"})
-local SettingsTab= Window:CreateTab({Name = "Settings",Icon = "⚙️"})
+local isMinimized          = false
 
 -- =============================================
 -- ROLE / TEAM HELPERS
@@ -264,7 +84,7 @@ local function IsSurvivor(player)
 end
 
 -- =============================================
--- SPEED HACK FUNCTIONS (defined before UI use)
+-- SPEED HACK FUNCTIONS
 -- =============================================
 
 local function applySpeed(humanoid)
@@ -297,7 +117,7 @@ local function onCharacterAddedSpeed(character)
 end
 
 -- =============================================
--- ESP DRAWING (TRANSPARENT HITBOX BOX)
+-- ESP DRAWING
 -- =============================================
 
 local function CheckDrawingSupport()
@@ -316,7 +136,6 @@ local function CreateHitboxESPBox(player)
 
     local drawings = {}
 
-    -- 4 corner-bracket lines per corner = 8 lines (white corners only, no fill box)
     for i = 1, 8 do
         local line = Drawing.new("Line")
         line.Thickness = 2
@@ -326,7 +145,6 @@ local function CreateHitboxESPBox(player)
         table.insert(drawings, line)
     end
 
-    -- Name label
     local nameLabel = Drawing.new("Text")
     nameLabel.Size = 13
     nameLabel.Center = true
@@ -335,7 +153,6 @@ local function CreateHitboxESPBox(player)
     nameLabel.Visible = false
     table.insert(drawings, nameLabel)
 
-    -- Distance label
     local distLabel = Drawing.new("Text")
     distLabel.Size = 11
     distLabel.Center = true
@@ -423,7 +240,6 @@ local function UpdateHitboxESPBox(player)
     local distance = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 0
     local cornerLen= math.clamp(math.min((maxX - minX) * 0.25, (maxY - minY) * 0.25), 4, 20)
 
-    -- Only corner brackets, no fill — visually subtle / transparent look
     local w = Color3.fromRGB(255, 255, 255)
     esp.cornerTL1.From = Vector2.new(minX, minY); esp.cornerTL1.To = Vector2.new(minX + cornerLen, minY); esp.cornerTL1.Color = w; esp.cornerTL1.Visible = true
     esp.cornerTL2.From = Vector2.new(minX, minY); esp.cornerTL2.To = Vector2.new(minX, minY + cornerLen); esp.cornerTL2.Color = w; esp.cornerTL2.Visible = true
@@ -565,7 +381,6 @@ local function updatePlayerNametag(player)
 
     ApplyHighlight(player.Character, color)
 
-    -- Mask display
     local rawMask = GetGameValue(player, "Mask") or GetGameValue(player.Character, "Mask")
     local hasMask = false
     if isKiller and string.match(tostring(selectedKillerAttr):lower(), "masked") and rawMask then
@@ -591,7 +406,6 @@ local function updatePlayerNametag(player)
         local mb = rootPart:FindFirstChild("MaskHook") if mb then mb:Destroy() end
     end
 
-    -- Chased indicator
     local chasedLabel2D = IndicatorGui:FindFirstChild(player.Name .. "_Chased")
     if isChased then
         local ct3 = billboard:FindFirstChild("ChasedLabel")
@@ -634,7 +448,6 @@ local function updatePlayerNametag(player)
         local ct3 = billboard and billboard:FindFirstChild("ChasedLabel") if ct3 then ct3:Destroy() end
     end
 
-    -- Off-screen killer indicator
     local killerLabel2D = IndicatorGui:FindFirstChild(player.Name .. "_Killer")
     if isKiller then
         if not killerLabel2D then
@@ -853,237 +666,399 @@ local function UpdateHitboxes()
 end
 
 -- =============================================
--- AXION UI — PLAYER TAB
+-- MOBILE UI SETUP (18:9 Aspect Ratio - YutzzHUB)
 -- =============================================
 
-local PlayerSection = PlayerTab:CreateSection("Player Settings")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "YutzzHUB"
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.DisplayOrder = 9999
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Enabled = true
+ScreenGui.Parent = PlayerGui
 
-local speedToggle = PlayerSection:CreateToggle({
-    Name         = "Speed Hack",
-    CurrentValue = false,
-    Flag         = "SpeedHack",
-    Callback     = function(value)
-        speedHackEnabled = value
-        local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if not value and humanoid then
-            humanoid.WalkSpeed = 16
-            for _, conn in ipairs(speedConnections) do conn:Disconnect() end
-            speedConnections = {}
-        elseif value and humanoid then
-            setupSpeedEnforcement(humanoid)
-        end
+local UI_WIDTH = 230
+local UI_HEIGHT = 460
+local TITLE_HEIGHT = 32
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, UI_WIDTH, 0, UI_HEIGHT)
+MainFrame.Position = UDim2.new(0, 8, 0.5, -UI_HEIGHT / 2)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local originalSize = MainFrame.Size
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(100, 100, 255)
+MainStroke.Thickness = 1.2
+MainStroke.Parent = MainFrame
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, TITLE_HEIGHT)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+local TitleFix = Instance.new("Frame")
+TitleFix.Size = UDim2.new(1, 0, 0.5, 0)
+TitleFix.Position = UDim2.new(0, 0, 0.5, 0)
+TitleFix.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+TitleFix.BorderSizePixel = 0
+TitleFix.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Size = UDim2.new(1, -45, 1, 0)
+TitleLabel.Position = UDim2.new(0, 8, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "YutzzHUB"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 12
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+local SubLabel = Instance.new("TextLabel")
+SubLabel.Size = UDim2.new(1, -45, 1, 0)
+SubLabel.Position = UDim2.new(0, 8, 0, 0)
+SubLabel.BackgroundTransparency = 1
+SubLabel.Text = "Mobile Script"
+SubLabel.TextColor3 = Color3.fromRGB(130, 130, 255)
+SubLabel.Font = Enum.Font.Gotham
+SubLabel.TextSize = 9
+SubLabel.TextXAlignment = Enum.TextXAlignment.Right
+SubLabel.Parent = TitleBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Name = "MinimizeBtn"
+MinimizeBtn.Size = UDim2.new(0, 24, 0, 16)
+MinimizeBtn.Position = UDim2.new(1, -30, 0.5, -8)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.TextSize = 13
+MinimizeBtn.BorderSizePixel = 0
+MinimizeBtn.Parent = TitleBar
+
+local MinimizeCorner = Instance.new("UICorner")
+MinimizeCorner.CornerRadius = UDim.new(0, 4)
+MinimizeCorner.Parent = MinimizeBtn
+
+local ContentFrame = Instance.new("ScrollingFrame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, -8, 1, -(TITLE_HEIGHT + 6))
+ContentFrame.Position = UDim2.new(0, 4, 0, TITLE_HEIGHT + 2)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.BorderSizePixel = 0
+ContentFrame.ScrollBarThickness = 2
+ContentFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 255)
+ContentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+ContentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ContentFrame.Parent = MainFrame
+
+local ContentLayout = Instance.new("UIListLayout")
+ContentLayout.Padding = UDim.new(0, 3)
+ContentLayout.Parent = ContentFrame
+
+local ContentPadding = Instance.new("UIPadding")
+ContentPadding.PaddingTop = UDim.new(0, 3)
+ContentPadding.PaddingLeft = UDim.new(0, 3)
+ContentPadding.PaddingRight = UDim.new(0, 3)
+ContentPadding.Parent = ContentFrame
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    isMinimized = not isMinimized
+    if isMinimized then
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = UDim2.new(0, UI_WIDTH, 0, TITLE_HEIGHT)}):Play()
+        ContentFrame.Visible = false
+        MinimizeBtn.Text = "+"
+    else
+        TweenService:Create(MainFrame, TweenInfo.new(0.3), {Size = originalSize}):Play()
+        ContentFrame.Visible = true
+        MinimizeBtn.Text = "-"
     end
-})
+end)
 
-local walkSpeedSlider = PlayerSection:CreateSlider({
-    Name         = "Walk Speed",
-    Range        = {16, 300},
-    Increment    = 1,
-    Suffix       = " studs/s",
-    CurrentValue = 16,
-    Flag         = "WalkSpeed",
-    Callback     = function(value)
-        desiredSpeed     = value
+-- =============================================
+-- UI PROTECTION
+-- =============================================
+
+local function ProtectUI()
+    task.spawn(function()
+        while true do
+            task.wait(0.5)
+            if not ScreenGui or not ScreenGui.Parent then
+                pcall(function() ScreenGui.Parent = PlayerGui end)
+            end
+            if ScreenGui then
+                if not ScreenGui.Enabled then ScreenGui.Enabled = true end
+                if ScreenGui.DisplayOrder ~= 9999 then ScreenGui.DisplayOrder = 9999 end
+            end
+            if MainFrame and not MainFrame.Visible then
+                MainFrame.Visible = true
+            end
+        end
+    end)
+end
+
+PlayerGui.ChildAdded:Connect(function()
+    task.wait(0.2)
+    pcall(function()
+        if not ScreenGui.Parent then ScreenGui.Parent = PlayerGui end
+        ScreenGui.Enabled = true
+        ScreenGui.DisplayOrder = 9999
+        if MainFrame then MainFrame.Visible = true end
+    end)
+end)
+
+LocalPlayer:GetPropertyChangedSignal("Team"):Connect(function()
+    task.wait(0.3)
+    pcall(function()
+        if not ScreenGui.Parent then ScreenGui.Parent = PlayerGui end
+        ScreenGui.Enabled = true
+        ScreenGui.DisplayOrder = 9999
+        if MainFrame then MainFrame.Visible = true end
+    end)
+end)
+
+-- =============================================
+-- UI COMPONENT BUILDERS
+-- =============================================
+
+local function CreateSectionLabel(text)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 22)
+    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 60)
+    frame.BorderSizePixel = 0
+    frame.Parent = ContentFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -8, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(130, 130, 255)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 10
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    return frame
+end
+
+local function CreateToggle(labelText, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 28)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 45)
+    frame.BorderSizePixel = 0
+    frame.Parent = ContentFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -50, 1, 0)
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 11
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local toggleBg = Instance.new("Frame")
+    toggleBg.Size = UDim2.new(0, 36, 0, 18)
+    toggleBg.Position = UDim2.new(1, -42, 0.5, -9)
+    toggleBg.BackgroundColor3 = default and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(60, 60, 80)
+    toggleBg.BorderSizePixel = 0
+    toggleBg.Parent = frame
+
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggleBg
+
+    local toggleKnob = Instance.new("Frame")
+    toggleKnob.Size = UDim2.new(0, 12, 0, 12)
+    toggleKnob.Position = default and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+    toggleKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    toggleKnob.BorderSizePixel = 0
+    toggleKnob.Parent = toggleBg
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = toggleKnob
+
+    local state = default or false
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = frame
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        TweenService:Create(toggleBg, TweenInfo.new(0.2), {
+            BackgroundColor3 = state and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(60, 60, 80)
+        }):Play()
+        TweenService:Create(toggleKnob, TweenInfo.new(0.2), {
+            Position = state and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+        }):Play()
+        callback(state)
+    end)
+
+    return frame
+end
+
+local function CreateTextbox(labelText, placeholder, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 45)
+    frame.BorderSizePixel = 0
+    frame.Parent = ContentFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -8, 0, 18)
+    label.Position = UDim2.new(0, 8, 0, 3)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(220, 220, 220)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 10
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local inputBox = Instance.new("TextBox")
+    inputBox.Size = UDim2.new(1, -16, 0, 22)
+    inputBox.Position = UDim2.new(0, 8, 0, 24)
+    inputBox.BackgroundColor3 = Color3.fromRGB(40, 40, 65)
+    inputBox.Text = ""
+    inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    inputBox.PlaceholderText = placeholder or "Enter value..."
+    inputBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 150)
+    inputBox.Font = Enum.Font.Gotham
+    inputBox.TextSize = 11
+    inputBox.BorderSizePixel = 0
+    inputBox.ClearTextOnFocus = false
+    inputBox.Parent = frame
+
+    local inputCorner = Instance.new("UICorner")
+    inputCorner.CornerRadius = UDim.new(0, 4)
+    inputCorner.Parent = inputBox
+
+    inputBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed then callback(inputBox.Text) end
+    end)
+
+    return frame
+end
+
+-- =============================================
+-- BUILD UI SECTIONS
+-- =============================================
+
+CreateSectionLabel("⚡ Player Settings")
+
+CreateToggle("Enable Speed Hack", false, function(state)
+    speedHackEnabled = state
+    local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if not state and humanoid then
+        humanoid.WalkSpeed = 16
+        for _, conn in ipairs(speedConnections) do conn:Disconnect() end
+        speedConnections = {}
+    elseif state and humanoid then
+        setupSpeedEnforcement(humanoid)
+    end
+end)
+
+CreateTextbox("WalkSpeed", "Enter speed (default 16)", function(input)
+    local speed = tonumber(input)
+    if speed then
+        desiredSpeed = speed
         speedHackEnabled = true
-        speedToggle:Set(true)
         local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         applySpeed(humanoid)
     end
-})
+end)
 
--- =============================================
--- AXION UI — HITBOX TAB
--- =============================================
+CreateSectionLabel("🎯 Hitbox Settings")
 
-local HitboxSection = HitboxTab:CreateSection("Hitbox Settings")
-
-local hitboxToggle = HitboxSection:CreateToggle({
-    Name         = "Enable Hitbox",
-    CurrentValue = false,
-    Flag         = "HitboxEnabled",
-    Callback     = function(value)
-        Config.HITBOX_Enabled = value
-        if not value then
-            for player, origSize in pairs(OriginalHitboxSizes) do
-                if player and player.Character then
-                    local root = player.Character:FindFirstChild("HumanoidRootPart")
-                    if root then root.Size = origSize; root.Transparency = 1; root.CanCollide = true end
-                end
-            end
-            OriginalHitboxSizes = {}
-        end
-    end
-})
-
-local hitboxSizeSlider = HitboxSection:CreateSlider({
-    Name         = "Hitbox Size",
-    Range        = {5, 50},
-    Increment    = 1,
-    Suffix       = " studs",
-    CurrentValue = 10,
-    Flag         = "HitboxSize",
-    Callback     = function(value)
-        Config.HITBOX_Size = value
-    end
-})
-
-local hitboxTransparencySlider = HitboxSection:CreateSlider({
-    Name         = "Hitbox Transparency",
-    Range        = {0, 100},
-    Increment    = 1,
-    Suffix       = "%",
-    CurrentValue = 100,
-    Flag         = "HitboxTransparency",
-    Callback     = function(value)
-        -- 100% = fully invisible (1), 0% = fully visible (0)
-        Config.HITBOX_Transparency = value / 100
-    end
-})
-
-local hitboxESPToggle = HitboxSection:CreateToggle({
-    Name         = "Hitbox ESP (Corner Brackets)",
-    CurrentValue = false,
-    Flag         = "HitboxESP",
-    Callback     = function(value)
-        Config.HITBOX_ESP = value
-        if not value then RemoveAllHitboxESPBoxes() end
-    end
-})
-
-local espColorPicker = HitboxSection:CreateColorPicker({
-    Name     = "ESP Bracket Color",
-    Color    = Color3.fromRGB(255, 50, 50),
-    Flag     = "ESPColor",
-    Callback = function(color)
-        Config.HITBOX_ESP_Color = color
-    end
-})
-
--- =============================================
--- AXION UI — GAME TAB
--- =============================================
-
-local GameSection = GameTab:CreateSection("Game Settings")
-
-local autoSkillToggle = GameSection:CreateToggle({
-    Name         = "Auto Skillcheck",
-    CurrentValue = true,
-    Flag         = "AutoSkill",
-    Callback     = function(value)
-        autoSkillcheckEnabled = value
-        if value then
-            InitializeAutobuy()
-        else
-            if HeartbeatConnection  then HeartbeatConnection:Disconnect();  HeartbeatConnection  = nil end
-            if VisibilityConnection then VisibilityConnection:Disconnect(); VisibilityConnection = nil end
-        end
-    end
-})
-
-local fullbrightToggle = GameSection:CreateToggle({
-    Name         = "Fullbright",
-    CurrentValue = true,
-    Flag         = "Fullbright",
-    Callback     = function(value)
-        fullbrightEnabled = value
-        if not value then
-            Lighting.Ambient       = Color3.fromRGB(127, 127, 127)
-            Lighting.OutdoorAmbient= Color3.fromRGB(127, 127, 127)
-            Lighting.Brightness    = 1
-            Lighting.ClockTime     = 14
-            Lighting.GlobalShadows = true
-            Lighting.FogEnd        = 100000
-        end
-    end
-})
-
--- =============================================
--- AXION UI — SETTINGS TAB
--- =============================================
-
-local SettingsSection = SettingsTab:CreateSection("Interface")
-
-local themeDropdown = SettingsSection:CreateDropdown({
-    Name          = "Theme",
-    Options       = {"Default", "Dark", "Light", "Ocean", "Midnight", "Emerald", "Crimson", "Galaxy", "Sunset", "Cyberpunk"},
-    CurrentOption = "Default",
-    Flag          = "Theme",
-    Callback      = function(value)
-        Window:SetTheme(value)
-    end
-})
-
-local resetButton = SettingsSection:CreateButton({
-    Name     = "Reset All Settings",
-    Callback = function()
-        speedToggle:Set(false)
-        walkSpeedSlider:Set(16)
-        hitboxToggle:Set(false)
-        hitboxSizeSlider:Set(10)
-        hitboxTransparencySlider:Set(100)
-        hitboxESPToggle:Set(false)
-        autoSkillToggle:Set(true)
-        fullbrightToggle:Set(true)
-        espColorPicker:Set(Color3.fromRGB(255, 50, 50))
-    end
-})
-
-local destroyButton = SettingsSection:CreateButton({
-    Name     = "Destroy UI",
-    Callback = function()
-        Window:Destroy()
-    end
-})
-
--- Shared minimize state and function
-local _minIsHidden = false
-local _axionMainFrame = nil
-
-local function findAxionMainFrame()
-    if _axionMainFrame and _axionMainFrame.Parent then return _axionMainFrame end
-    for _, sg in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
-        if sg:IsA("TextLabel") and sg.Text == "Yutzz HUB" then
-            local p = sg.Parent
-            while p and not p:IsA("ScreenGui") do
-                if p:IsA("Frame") and p.Size.X.Offset > 200 and p.Size.Y.Offset > 200 then
-                    _axionMainFrame = p
-                    return p
-                end
-                p = p.Parent
+CreateToggle("Enable Hitbox", false, function(state)
+    Config.HITBOX_Enabled = state
+    if not state then
+        for player, origSize in pairs(OriginalHitboxSizes) do
+            if player and player.Character then
+                local root = player.Character:FindFirstChild("HumanoidRootPart")
+                if root then root.Size = origSize; root.Transparency = 1; root.CanCollide = true end
             end
         end
+        OriginalHitboxSizes = {}
     end
-    return nil
-end
+end)
 
-local function doMinimize()
-    local frame = findAxionMainFrame()
-    if not frame then return end
-    _minIsHidden = not _minIsHidden
-    frame.Visible = not _minIsHidden
-end
+CreateTextbox("Hitbox Size", "Enter size (default 10)", function(input)
+    local size = tonumber(input)
+    if size and size > 0 then Config.HITBOX_Size = size end
+end)
 
-local minimizeButton = SettingsSection:CreateButton({
-    Name     = "Minimize / Show UI",
-    Callback = function()
-        doMinimize()
+CreateTextbox("Hitbox Transparency", "0-1 (default 1 = invisible)", function(input)
+    local trans = tonumber(input)
+    if trans and trans >= 0 and trans <= 1 then Config.HITBOX_Transparency = trans end
+end)
+
+CreateToggle("Hitbox ESP (Corner Brackets)", false, function(state)
+    Config.HITBOX_ESP = state
+    if not state then RemoveAllHitboxESPBoxes() end
+end)
+
+CreateSectionLabel("🔧 Game Settings")
+
+CreateToggle("Auto Skillcheck", true, function(state)
+    autoSkillcheckEnabled = state
+    if state then
+        InitializeAutobuy()
+    else
+        if HeartbeatConnection  then HeartbeatConnection:Disconnect();  HeartbeatConnection  = nil end
+        if VisibilityConnection then VisibilityConnection:Disconnect(); VisibilityConnection = nil end
     end
-})
+end)
 
-local KeybindSection = SettingsTab:CreateSection("Keybinds")
-
-local toggleKeybind = KeybindSection:CreateKeybind({
-    Name           = "Toggle UI",
-    CurrentKeybind = "RightShift",
-    Flag           = "ToggleKey",
-    Callback       = function()
-        doMinimize()
+CreateToggle("Fullbright", true, function(state)
+    fullbrightEnabled = state
+    if not value then
+        Lighting.Ambient       = Color3.fromRGB(127, 127, 127)
+        Lighting.OutdoorAmbient= Color3.fromRGB(127, 127, 127)
+        Lighting.Brightness    = 1
+        Lighting.ClockTime     = 14
+        Lighting.GlobalShadows = true
+        Lighting.FogEnd        = 100000
     end
-})
-
-local InfoSection = SettingsTab:CreateSection("Information")
-InfoSection:CreateLabel("Yutzz HUB — Axion UI Edition")
-InfoSection:CreateLabel("Player: " .. LocalPlayer.Name)
+end)
 
 -- =============================================
 -- CONNECTIONS
@@ -1120,13 +1095,9 @@ end)
 Players.PlayerAdded:Connect(function(player)
     player.CharacterAdded:Connect(function()
         task.wait(0.5)
-        if Config.HITBOX_ESP and ESPDrawingEnabled then
-            CreateHitboxESPBox(player)
-        end
+        if Config.HITBOX_ESP and ESPDrawingEnabled then CreateHitboxESPBox(player) end
     end)
-    player.CharacterRemoving:Connect(function()
-        RemoveHitboxESPBox(player)
-    end)
+    player.CharacterRemoving:Connect(function() RemoveHitboxESPBox(player) end)
 end)
 
 for _, player in ipairs(Players:GetPlayers()) do
@@ -1219,5 +1190,6 @@ end)
 SetupGui()
 RefreshESP()
 InitializeAutobuy()
+ProtectUI()
 
 if LocalPlayer.Character then onCharacterAddedSpeed(LocalPlayer.Character) end
